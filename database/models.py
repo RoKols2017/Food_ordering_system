@@ -1,12 +1,19 @@
-# database/models.py
-from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, DateTime, Text, func
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from datetime import datetime
+import pytz
+
+# Определяем локальный часовой пояс (замените на нужный вам, если необходимо)
+LOCAL_TIMEZONE = pytz.timezone("Europe/Moscow")
+
+def local_now():
+    """Возвращает текущее время с учетом локального часового пояса."""
+    return datetime.now(LOCAL_TIMEZONE)
 
 Base = declarative_base()
 
 class User(Base):
-    """Модель пользователя"""
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -14,14 +21,13 @@ class User(Base):
     username = Column(String)
     first_name = Column(String)
     last_name = Column(String)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=local_now)
 
     orders = relationship("Order", back_populates="user")
     reviews = relationship("Review", back_populates="user")
 
 
 class Restaurant(Base):
-    """Модель ресторана"""
     __tablename__ = 'restaurants'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -29,7 +35,7 @@ class Restaurant(Base):
     description = Column(Text)
     address = Column(String)
     phone = Column(String)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=local_now)
 
     categories = relationship("Category", back_populates="restaurant")
     dishes = relationship("Dish", back_populates="restaurant")
@@ -38,7 +44,6 @@ class Restaurant(Base):
 
 
 class Category(Base):
-    """Модель категории блюд"""
     __tablename__ = 'categories'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -51,7 +56,6 @@ class Category(Base):
 
 
 class Dish(Base):
-    """Модель блюда"""
     __tablename__ = 'dishes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -62,7 +66,7 @@ class Dish(Base):
     category_id = Column(Integer, ForeignKey('categories.id'), nullable=False)
     restaurant_id = Column(Integer, ForeignKey('restaurants.id'), nullable=False)
     available = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=local_now)
 
     category = relationship("Category", back_populates="dishes")
     restaurant = relationship("Restaurant", back_populates="dishes")
@@ -70,18 +74,17 @@ class Dish(Base):
 
 
 class Order(Base):
-    """Модель заказа"""
     __tablename__ = 'orders'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     restaurant_id = Column(Integer, ForeignKey('restaurants.id'), nullable=False)
-    order_date = Column(DateTime, default=func.now())
+    order_date = Column(DateTime(timezone=True), default=local_now)
     status = Column(String, nullable=False, default='new')  # 'cart', 'new', 'processing', 'completed', 'cancelled'
     total_cost = Column(Float)
     payment_method = Column(String)  # 'online', 'cash'
     comment = Column(Text)
-    updated_at = Column(DateTime, onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=local_now)
 
     user = relationship("User", back_populates="orders")
     restaurant = relationship("Restaurant", back_populates="orders")
@@ -89,7 +92,6 @@ class Order(Base):
 
 
 class OrderItem(Base):
-    """Модель позиции заказа"""
     __tablename__ = 'order_items'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -105,7 +107,6 @@ class OrderItem(Base):
 
 
 class Review(Base):
-    """Модель отзыва"""
     __tablename__ = 'reviews'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -114,7 +115,7 @@ class Review(Base):
     order_id = Column(Integer, ForeignKey('orders.id'))
     rating = Column(Integer, nullable=False)
     comment = Column(Text)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=local_now)
 
     user = relationship("User", back_populates="reviews")
     restaurant = relationship("Restaurant", back_populates="reviews")
