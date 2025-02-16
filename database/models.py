@@ -1,3 +1,4 @@
+# database/models.py
 from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
