@@ -1,4 +1,3 @@
-# handlers/main_menu.py
 from telebot import TeleBot, types
 import logging
 from handlers import order_utils
@@ -46,11 +45,11 @@ def register_handlers(bot: TeleBot):
     @bot.callback_query_handler(func=lambda call: call.data == "main_view_cart")
     def view_cart_handler(call: types.CallbackQuery):
         try:
-            # Используем функцию get_cart_details из order_utils
-            cart_details = order_utils.get_cart_details(db, call.from_user.id)
+            text, markup = order_utils.get_cart_details_markup(db, call.from_user.id)
             bot.edit_message_text(chat_id=call.message.chat.id,
                                   message_id=call.message.message_id,
-                                  text=cart_details)
+                                  text=text,
+                                  reply_markup=markup)
         except Exception as e:
             logging.error("Ошибка в view_cart_handler: %s", e)
             bot.answer_callback_query(call.id, "Ошибка при просмотре корзины.")

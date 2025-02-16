@@ -1,4 +1,3 @@
-# handlers/order.py
 import logging
 from datetime import datetime
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -11,7 +10,7 @@ def set_db(db_instance):
     global db
     db = db_instance
 
-# Добавляем недостающую функцию create_cart:
+# Функция для создания корзины (заказ со статусом 'cart')
 def create_cart(user_id, restaurant_id):
     session = db.Session()
     try:
@@ -79,8 +78,6 @@ def add_dish_to_cart(user_id, dish_id, quantity=1):
     finally:
         session.close()
 
-# Остальные функции (update_order_item_quantity, confirm_order и т.д.) остаются без изменений
-
 def register_handlers(bot):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("order_add_"))
     def order_add_callback(call):
@@ -101,6 +98,123 @@ def register_handlers(bot):
         except Exception as e:
             logging.error("Ошибка в order_add_callback: %s", e)
             bot.answer_callback_query(call.id, "Произошла ошибка при добавлении блюда.")
+
+    @bot.callback_query_handler(func=lambda call: call.data == "back_to_main_menu")
+    def back_to_main_menu_callback(call):
+        from handlers import main_menu
+        main_menu.send_main_menu(bot, call.message.chat.id)
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("increase_"))
+    def increase_quantity(call):
+        try:
+            item_id = int(call.data.split("_")[1])
+            session = db.Session()
+            from database.models import OrderItem, Dish, Order
+            item = session.query(OrderItem).filter_by(id=item_id).first()
+            if not item:
+                bot.answer_callback_query(call.id, "Элемент не найден.")
+                return
+            item.quantity += 1
+            dish = db.get_dish(item.dish_id)
+            item.total = item.quantity * dish.price
+            # Пересчёт общей стоимости корзины
+            cart = session.query(Order).filter_by(id=item.order_id).first()
+            order_items = session.query(OrderItem).filter_by(order_id=cart.id).all()
+            cart.total_cost = sum(i.total for i in order_items)
+            session.commit()
+            bot.answer_callback_query(call.id, "Количество увеличено.")
+            text, markup = order_utils.get_cart_details_markup(db, call.from_user.id)
+            bot.edit_message_text(chat_id=call.message.chat.id,
+                                  message_id=call.message.message_id,
+                                  text=text,
+                                  reply_markup=markup)
+        except Exception as e:
+            session.rollback()
+            bot.answer_callback_query(call.id, "Ошибка при обновлении количества.")
+        finally:
+            session.close()
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("decrease_"))
+    def decrease_quantity(call):
+        try:
+            item_id = int(call.data.split("_")[1])
+            session = db.Session()
+            from database.models import OrderItem, Dish, Order
+            item = session.query(OrderItem).filter_by(id=item_id).first()
+            if not item:
+                bot.answer_callback_query(call.id, "Элемент не найден.")
+                return
+            if item.quantity > 1:
+                item.quantity -= 1
+                dish = db.get_dish(item.dish_id)
+                item.total = item.quantity * dish.price
+            else:
+                # Если количество равно 1, удаляем позицию
+                session.delete(item)
+            # Пересчёт общей стоимости корзины
+            cart = session.query(Order).filter_by(id=item.order_id).first()
+            order_items = session.query(OrderItem).filter_by(order_id=cart.id).all()
+            cart.total_cost = sum(i.total for i in order_items)
+            session.commit()
+            bot.answer_callback_query(call.id, "Количество уменьшено.")
+            text, markup = order_utils.get_cart_details_markup(db, call.from_user.id)
+            bot.edit_message_text(chat_id=call.message.chat.id,
+                                  message_id=call.message.message_id,
+                                  text=text,
+                                  reply_markup=markup)
+        except Exception as e:
+            session.rollback()
+            bot.answer_callback_query(call.id, "Ошибка при обновлении количества.")
+        finally:
+            session.close()
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("remove_"))
+    def remove_item(call):
+        try:
+            item_id = int(call.data.split("_")[1])
+            session = db.Session()
+            from database.models import OrderItem, Order
+            item = session.query(OrderItem).filter_by(id=item_id).first()
+            if not item:
+                bot.answer_callback_query(call.id, "Элемент не найден.")
+                return
+            order_id = item.order_id
+            session.delete(item)
+            # Пересчёт общей стоимости корзины
+            cart = session.query(Order).filter_by(id=order_id).first()
+            order_items = session.query(OrderItem).filter_by(order_id=order_id).all()
+            cart.total_cost = sum(i.total for i in order_items)
+            session.commit()
+            bot.answer_callback_query(call.id, "Позиция удалена.")
+            text, markup = order_utils.get_cart_details_markup(db, call.from_user.id)
+            bot.edit_message_text(chat_id=call.message.chat.id,
+                                  message_id=call.message.message_id,
+                                  text=text,
+                                  reply_markup=markup)
+        except Exception as e:
+            session.rollback()
+            bot.answer_callback_query(call.id, "Ошибка при удалении позиции.")
+        finally:
+            session.close()
+
+    @bot.callback_query_handler(func=lambda call: call.data == "confirm_order")
+    def confirm_order_callback(call):
+        try:
+            session = db.Session()
+            from database.models import Order
+            cart = session.query(Order).filter_by(user_id=call.from_user.id, status='cart').first()
+            if not cart:
+                bot.answer_callback_query(call.id, "Корзина пуста.")
+                return
+            cart.status = 'new'
+            session.commit()
+            bot.answer_callback_query(call.id, "Заказ подтвержден!")
+            bot.send_message(call.message.chat.id, "Ваш заказ подтвержден. Ожидайте его обработки.")
+        except Exception as e:
+            session.rollback()
+            bot.answer_callback_query(call.id, "Ошибка при подтверждении заказа.")
+        finally:
+            session.close()
 
     @bot.callback_query_handler(func=lambda call: call.data == "back_to_main_menu")
     def back_to_main_menu_callback(call):
