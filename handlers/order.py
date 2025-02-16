@@ -1,5 +1,4 @@
 # handlers/order.py
-
 import logging
 from datetime import datetime
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -12,7 +11,27 @@ def set_db(db_instance):
     global db
     db = db_instance
 
-# Пример функции добавления блюда в корзину (без изменений)
+# Добавляем недостающую функцию create_cart:
+def create_cart(user_id, restaurant_id):
+    session = db.Session()
+    try:
+        from database.models import Order
+        new_order = Order(
+            user_id=user_id,
+            restaurant_id=restaurant_id,
+            status='cart',
+            total_cost=0.0
+        )
+        session.add(new_order)
+        session.commit()
+        return new_order
+    except Exception as e:
+        session.rollback()
+        logging.error("Ошибка создания корзины для пользователя %s: %s", user_id, e)
+        return None
+    finally:
+        session.close()
+
 def add_dish_to_cart(user_id, dish_id, quantity=1):
     dish = db.get_dish(dish_id)
     if not dish:
@@ -60,7 +79,7 @@ def add_dish_to_cart(user_id, dish_id, quantity=1):
     finally:
         session.close()
 
-# Остальные функции (update_order_item_quantity, confirm_order, и т.д.) оставляем без изменений
+# Остальные функции (update_order_item_quantity, confirm_order и т.д.) остаются без изменений
 
 def register_handlers(bot):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("order_add_"))
@@ -82,8 +101,6 @@ def register_handlers(bot):
         except Exception as e:
             logging.error("Ошибка в order_add_callback: %s", e)
             bot.answer_callback_query(call.id, "Произошла ошибка при добавлении блюда.")
-
-    # ... остальные обработчики, включая order_edit_callback, order_view_handler и т.д.
 
     @bot.callback_query_handler(func=lambda call: call.data == "back_to_main_menu")
     def back_to_main_menu_callback(call):

@@ -5,36 +5,26 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 import config
 from database.models import Base, User
 
-
 class Database:
     def __init__(self, db_url=config.SQLALCHEMY_DATABASE_URI):
         # Параметр check_same_thread=False нужен для SQLite при использовании в многопоточном режиме
         self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
         # Создание таблиц (если их ещё нет)
         Base.metadata.create_all(self.engine)
-        self.Session = scoped_session(sessionmaker(bind=self.engine))
+        # Важно: не истекать объекты после commit
+        self.Session = scoped_session(sessionmaker(bind=self.engine, expire_on_commit=False))
 
     def register_user(self, message):
-        """
-        Регистрирует пользователя в базе данных с использованием SQLAlchemy ORM.
-
-        Возвращает:
-            bool: True, если пользователь новый, иначе False.
-        """
         session = self.Session()
         try:
             telegram_id = message.from_user.id
             username = message.from_user.username or ""
             first_name = message.from_user.first_name or ""
             last_name = message.from_user.last_name or ""
-
-            # Проверяем, существует ли уже пользователь с таким telegram_id
             user = session.query(User).filter_by(telegram_id=telegram_id).first()
             if user:
                 logging.info(f"Пользователь {telegram_id} уже существует.")
                 return False
-
-            # Создаем нового пользователя
             new_user = User(
                 telegram_id=telegram_id,
                 username=username,
@@ -52,7 +42,6 @@ class Database:
         finally:
             session.close()
 
-    # Метод: получить список ресторанов
     def get_restaurants(self):
         session = self.Session()
         try:
@@ -65,7 +54,6 @@ class Database:
         finally:
             session.close()
 
-    # Метод: получить категории по id ресторана
     def get_categories(self, restaurant_id):
         session = self.Session()
         try:
@@ -78,7 +66,6 @@ class Database:
         finally:
             session.close()
 
-    # Метод: получить список блюд по id категории
     def get_dishes(self, category_id):
         session = self.Session()
         try:
@@ -91,7 +78,6 @@ class Database:
         finally:
             session.close()
 
-    # Метод: получить данные по конкретному блюду
     def get_dish(self, dish_id):
         session = self.Session()
         try:

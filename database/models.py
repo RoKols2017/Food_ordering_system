@@ -23,6 +23,8 @@ class User(Base):
     first_name = Column(String)
     last_name = Column(String)
     created_at = Column(DateTime(timezone=True), default=local_now)
+    # Новое поле для отметки согласия с пользовательским соглашением:
+    accepted_terms = Column(Boolean, default=False)
 
     orders = relationship("Order", back_populates="user")
     reviews = relationship("Review", back_populates="user")

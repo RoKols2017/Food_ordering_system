@@ -1,6 +1,6 @@
 # handlers/start.py
 import logging
-from handlers import main_menu
+from handlers import main_menu, legal
 
 db = None
 
@@ -20,6 +20,21 @@ def register_new_user(message):
         logging.error(f"Ошибка при регистрации пользователя {user_id}: {e}")
         return False
 
+def check_legal_agreement(user_id):
+    """
+    Проверяет, дал ли пользователь согласие с пользовательским соглашением.
+    """
+    session = db.Session()
+    try:
+        from database.models import User
+        user = session.query(User).filter_by(telegram_id=user_id).first()
+        return user.accepted_terms if user else False
+    except Exception as e:
+        logging.error("Ошибка при проверке пользовательского соглашения: %s", e)
+        return False
+    finally:
+        session.close()
+
 def get_greeting(is_new_user, first_name):
     if is_new_user:
         return f"Привет, {first_name}! Добро пожаловать в наш сервис заказа еды!"
@@ -33,8 +48,13 @@ def register_handlers(bot):
             first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else ""
             greeting = get_greeting(is_new_user, first_name)
             bot.send_message(message.chat.id, greeting)
-            # После приветствия сразу выводим главное меню
-            main_menu.send_main_menu(bot, message.chat.id)
+            # Проверяем, дал ли пользователь согласие
+            if not check_legal_agreement(message.from_user.id):
+                # Если нет – отправляем соглашение и блокируем дальнейшие действия до согласия
+                legal.show_legal_agreement(bot, message.chat.id)
+            else:
+                # Если уже согласился – показываем главное меню
+                main_menu.send_main_menu(bot, message.chat.id)
         except Exception as e:
             user_id = getattr(message.from_user, 'id', 'unknown')
             logging.error(f"Ошибка обработки команды /start для {user_id}: {e}")
