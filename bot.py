@@ -2,7 +2,7 @@
 import telebot
 import config
 import logging
-from handlers import start, menu
+from handlers import main_menu, start, menu, order
 from database.db import Database
 
 # Централизованная настройка логирования
@@ -15,12 +15,16 @@ bot = telebot.TeleBot(config.TOKEN)
 db = Database()
 
 # Передаём экземпляр базы данных в обработчики
+main_menu.set_db(db)
 start.set_db(db)
 menu.set_db(db)
+order.set_db(db)
 
 # Регистрируем обработчики
+main_menu.register_handlers(bot)
 start.register_handlers(bot)
 menu.register_handlers(bot)
+order.register_handlers(bot)
 
 if __name__ == '__main__':
     import logging

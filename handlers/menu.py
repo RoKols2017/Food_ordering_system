@@ -177,7 +177,7 @@ def register_handlers(bot):
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton(
             text="Добавить в заказ",
-            callback_data=f"add_{dish.id}"
+            callback_data=f"order_add_{dish.id}"
         ))
         # Кнопка "Назад" для возврата к списку блюд выбранной категории
         markup.add(InlineKeyboardButton(
